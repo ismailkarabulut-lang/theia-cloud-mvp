@@ -1,5 +1,4 @@
-import { supabase } from '@/lib/supabaseServer';
-
+import { supabase } from '../../supabaseServer';
 export default async function handler(req, res) {
   if (req.method === 'POST') {
     const { mood, stateOfMind, content, tags, audioUrl } = req.body;
