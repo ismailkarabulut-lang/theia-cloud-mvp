@@ -6,7 +6,16 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabase
       .from('entries')
-      .insert([{ mood, state_of_mind: stateOfMind, content, tags, audio_url: audioUrl }]);
+      .insert([
+        {
+          mood,
+          state_of_mind: stateOfMind,
+          content,
+          tags,
+          audio_url: audioUrl,
+          created_at: new Date(),
+        },
+      ]);
 
     if (error) return res.status(400).json({ error: error.message });
     res.status(200).json({ success: true, data });
