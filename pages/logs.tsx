@@ -62,7 +62,7 @@ export default function LogsPage() {
       });
       const j = await r.json();
       if (j?.ok && j?.data) {
-        setRows(prev => [j.data, ...prev].slice(0, 50));   // en üste ekle
+        setRows(prev => [j.data, ...prev].slice(0, 50)); // en üste ekle
         setContent('Hızlı test');
       } else {
         alert('Kayıt eklenemedi: ' + (j?.error ?? 'unknown'));
@@ -97,7 +97,19 @@ export default function LogsPage() {
 
   return (
     <main style={{ maxWidth: 900, margin: '40px auto', padding: '0 16px', fontFamily: 'ui-sans-serif, system-ui' }}>
-      <h1 style={{ fontSize: 28, marginBottom: 12 }}>Theia Logs</h1>
+      {/* ÜST BAR */}
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <h1 style={{ fontSize: 28 }}>Theia Logs</h1>
+        <nav style={{ display: 'flex', gap: 10 }}>
+          <a href="/api/health" target="_blank" rel="noreferrer" style={{ fontSize: 13, opacity: 0.9, textDecoration: 'underline' }}>
+            /api/health
+          </a>
+          <a href="/api/debug-supa" target="_blank" rel="noreferrer" style={{ fontSize: 13, opacity: 0.9, textDecoration: 'underline' }}>
+            /api/debug-supa
+          </a>
+        </nav>
+      </header>
+
       <p style={{ opacity: 0.8, marginBottom: 20 }}>Son kayıtlar (en yeni → eski)</p>
 
       {/* Hızlı ekleme formu */}
