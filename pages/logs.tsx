@@ -1,5 +1,6 @@
 // pages/logs.tsx
 import { useEffect, useState } from 'react';
+import { extractPatterns } from "../lib/patterns";
 
 type LogRow = {
   id: string;
@@ -25,193 +26,169 @@ export default function LogsPage() {
   const [adding, setAdding] = useState(false);
   const [content, setContent] = useState('Hızlı test');
 
+  // NPM özet state
+  const [patterns, setPatterns] = useState<any>(null);
+
   // SEARCH
   const [q, setQ] = useState('Theia');
   const [searching, setSearching] = useState(false);
   const [hits, setHits] = useState<VaultHit[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  // İlk yüklemede son loglar
+  // Ilk yuklemede son loglar
   useEffect(() => {
-    (async () => {
-      try {
-        const r = await fetch('/api/log');
-        const j = await r.json();
-        setRows((j?.results ?? []).slice(0, 50));
-      } finally {
+    fetch('/api/logs')
+      .then(res => res.json())
+      .then(data => {
+        setRows(data.results);
         setLoading(false);
-      }
-    })();
+
+        // NPM pattern analizi
+        const summary = extractPatterns(data.results || []);
+        setPatterns(summary);
+      });
   }, []);
 
-  // Tek tuşla POST
-  async function addQuickLog() {
-    try {
-      if (!content.trim()) return;
-      setAdding(true);
-      const r = await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mood: 'ok',
-          state_of_mind: 'quick add',
-          content,
-          tags: ['ui', 'quick'],
-          audio_url: null,
-        }),
-      });
-      const j = await r.json();
-      if (j?.ok && j?.data) {
-        setRows(prev => [j.data, ...prev].slice(0, 50)); // en üste ekle
-        setContent('Hızlı test');
-      } else {
-        alert('Kayıt eklenemedi: ' + (j?.error ?? 'unknown'));
-      }
-    } finally {
-      setAdding(false);
-    }
-  }
+  // HIZLI EKLE
+  const addQuick = async () => {
+    setAdding(true);
 
-  // /api/search
-  async function runSearch() {
+    const payload = {
+      mood: "ok",
+      state_of_mind: "quick add",
+      content,
+      tags: ["ui", "quick"]
+    };
+
+    await fetch('/api/log', {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    // yeniden verileri çek
+    const res = await fetch('/api/logs');
+    const data = await res.json();
+    setRows(data.results);
+
+    // pattern güncelle
+    const summary = extractPatterns(data.results || []);
+    setPatterns(summary);
+
+    setAdding(false);
+  };
+
+  // SEARCH
+  const doSearch = async () => {
+    if (!q) return;
+    setSearching(true);
+    setSearchError(null);
+
     try {
-      setSearching(true);
-      setSearchError(null);
-      const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-      const j = await r.json();
-      if (j?.ok) {
-        setHits(j?.results ?? []);
-      } else {
-        setHits([]);
-        setSearchError(j?.error ?? 'search_failed');
-      }
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      setHits(data.results || []);
     } catch (e: any) {
-      setHits([]);
-      setSearchError(e?.message ?? 'search_failed');
-    } finally {
-      setSearching(false);
+      setSearchError("Arama sırasında hata oluştu.");
     }
-  }
 
-  const box = { border: '1px solid #333', borderRadius: 8, padding: 12 };
+    setSearching(false);
+  };
 
   return (
-    <main style={{ maxWidth: 900, margin: '40px auto', padding: '0 16px', fontFamily: 'ui-sans-serif, system-ui' }}>
-      {/* ÜST BAR */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h1 style={{ fontSize: 28 }}>Theia Logs</h1>
-        <nav style={{ display: 'flex', gap: 10 }}>
-          <a href="/api/health" target="_blank" rel="noreferrer" style={{ fontSize: 13, opacity: 0.9, textDecoration: 'underline' }}>
-            /api/health
-          </a>
-          <a href="/api/debug-supa" target="_blank" rel="noreferrer" style={{ fontSize: 13, opacity: 0.9, textDecoration: 'underline' }}>
-            /api/debug-supa
-          </a>
-        </nav>
-      </header>
+    <div style={{ padding: 20 }}>
+      <h1>Theia Logs</h1>
 
-      <p style={{ opacity: 0.8, marginBottom: 20 }}>Son kayıtlar (en yeni → eski)</p>
+      {/* HIZLI TEST */}
+      <button
+        onClick={addQuick}
+        disabled={adding}
+        style={{ marginBottom: 20 }}
+      >
+        Hızlı Ekle
+      </button>
 
-      {/* Hızlı ekleme formu */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-        <input
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Kısa not..."
-          style={{ flex: 1, padding: 8, borderRadius: 6, border: '1px solid #333', background: '#111', color: '#eee' }}
-        />
-        <button
-          onClick={addQuickLog}
-          disabled={adding || !content.trim()}
-          style={{
-            padding: '8px 14px',
-            borderRadius: 6,
-            border: '1px solid #333',
-            background: adding ? '#333' : '#1a1a1a',
-            color: '#eee',
-            cursor: adding ? 'not-allowed' : 'pointer',
-          }}
-        >
-          {adding ? 'Ekleniyor…' : 'Hızlı Ekle'}
-        </button>
-      </div>
-
-      {/* SEARCH BLOK */}
-      <section style={{ marginBottom: 28 }}>
-        <h2 style={{ fontSize: 20, marginBottom: 10 }}>Vault Search</h2>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Arama terimi (ör. Theia)"
-            style={{ flex: 1, padding: 8, borderRadius: 6, border: '1px solid #333', background: '#111', color: '#eee' }}
-          />
-          <button
-            onClick={runSearch}
-            disabled={searching || !q.trim()}
-            style={{
-              padding: '8px 14px',
-              borderRadius: 6,
-              border: '1px solid #333',
-              background: searching ? '#333' : '#1a1a1a',
-              color: '#eee',
-              cursor: searching ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {searching ? 'Aranıyor…' : 'Ara'}
-          </button>
+      {/* LOGGER */}
+      {loading ? (
+        <p>Yükleniyor...</p>
+      ) : (
+        <div>
+          <h2>Son kayıtlar (en yeni → eski)</h2>
+          {rows.map((log) => (
+            <div
+              key={log.id}
+              style={{
+                marginBottom: 20,
+                padding: 12,
+                background: "#111",
+                borderRadius: 8,
+              }}
+            >
+              <p><b>{new Date(log.created_at).toLocaleString()}</b></p>
+              <p>{log.content}</p>
+              <p>Mood: {log.mood || "—"} · State: {log.state_of_mind || "—"}</p>
+              <p>Tags: {log.tags?.join(', ')}</p>
+            </div>
+          ))}
         </div>
+      )}
 
-        {searchError && <div style={{ color: '#ff7a7a', marginBottom: 10 }}>Hata: {searchError}</div>}
+      {/* NPM ÖZET BLOĞU */}
+      {patterns && (
+        <div style={{ marginTop: "40px", padding: "20px", background: "#1a1a1a", borderRadius: "8px" }}>
+          <h2 style={{ marginBottom: "10px" }}>Theia NPM Özet</h2>
+
+          <p>Toplam log: {patterns.totalLogs}</p>
+
+          <p>
+            En aktif saat:{" "}
+            {Object.entries(patterns.timePattern).length > 0
+              ? Object.entries(patterns.timePattern).sort((a, b) => b[1] - a[1])[0][0]
+              : "Veri yok"}
+          </p>
+
+          <p>
+            En sık mood:{" "}
+            {Object.entries(patterns.moodPattern).length > 0
+              ? Object.entries(patterns.moodPattern).sort((a, b) => b[1] - a[1])[0][0]
+              : "Veri yok"}
+          </p>
+
+          <p>Quick-add davranışı: {patterns.quickAddCount} kez</p>
+        </div>
+      )}
+
+      {/* SEARCH Bölümü */}
+      <div style={{ marginTop: 40 }}>
+        <h2>Vault Search</h2>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Ara..."
+          style={{ width: "60%", padding: 8, marginRight: 10 }}
+        />
+        <button onClick={doSearch} disabled={searching}>Ara</button>
+
+        {searchError && (
+          <p style={{ color: "red" }}>{searchError}</p>
+        )}
 
         {hits.length > 0 && (
-          <ul style={{ listStyle: 'none', padding: 0 }}>
-            {hits.map(h => (
-              <li key={h.id} style={{ ...box, marginBottom: 10 }}>
-                <div style={{ fontSize: 14, opacity: 0.9 }}>{h.file_path}</div>
-                <div style={{ fontSize: 16, marginTop: 4 }}>{h.title ?? '—'}</div>
-                {typeof h.similarity === 'number' && (
-                  <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
-                    similarity: {h.similarity.toFixed(3)}
-                  </div>
-                )}
-              </li>
+          <div style={{ marginTop: 20 }}>
+            <h3>Sonuçlar</h3>
+            {hits.map((h) => (
+              <div
+                key={h.id}
+                style={{ marginBottom: 20, padding: 12, background: "#111", borderRadius: 8 }}
+              >
+                <p><b>{h.file_path}</b></p>
+                <p>{h.title}</p>
+                <p>Benzerlik: {h.similarity}</p>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
-
-        {hits.length === 0 && !searching && (
-          <div style={{ opacity: 0.8 }}>Sonuç yok.</div>
-        )}
-      </section>
-
-      {/* LOG LISTESI */}
-      {loading ? (
-        <div>Yükleniyor…</div>
-      ) : rows.length === 0 ? (
-        <div>Kayıt bulunamadı.</div>
-      ) : (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {rows.map((row) => (
-            <li key={row.id} style={{ ...box, marginBottom: 10 }}>
-              <div style={{ fontSize: 13, opacity: 0.8 }}>
-                {new Date(row.created_at).toLocaleString()}
-              </div>
-              <div style={{ fontSize: 16, marginTop: 6 }}>
-                {row.content ?? '—'}
-              </div>
-              <div style={{ fontSize: 13, marginTop: 6, opacity: 0.9 }}>
-                Mood: {row.mood ?? '—'} · State: {row.state_of_mind ?? '—'}
-              </div>
-              {row.tags && row.tags.length > 0 && (
-                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.9 }}>
-                  Tags: {row.tags.join(', ')}
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </main>
+      </div>
+    </div>
   );
 }
