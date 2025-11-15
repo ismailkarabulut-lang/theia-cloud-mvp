@@ -51,7 +51,16 @@ export default function LogsPage() {
 
         setRows(data.results || []);
 
-        const summary = extractPatterns((data.results || []) as LogRow[]) as PatternSummary;
+        // ✅ DEĞİŞİKLİK: undefined → null dönüşümü
+        const summary = extractPatterns(
+          (data.results || []).map((row: LogRow) => ({
+            id: row.id,
+            timestamp: row.created_at,
+            mood: row.mood ?? null,
+            notes: row.content ?? null,
+            tags: row.tags ?? []
+          }))
+        ) as PatternSummary;
         setPatterns(summary);
       } finally {
         setLoading(false);
@@ -83,7 +92,16 @@ export default function LogsPage() {
       const data = await res.json();
       setRows(data.results || []);
 
-      const summary = extractPatterns((data.results || []) as LogRow[]) as PatternSummary;
+      // ✅ DEĞİŞİKLİK: undefined → null dönüşümü
+      const summary = extractPatterns(
+        (data.results || []).map((row: LogRow) => ({
+          id: row.id,
+          timestamp: row.created_at,
+          mood: row.mood ?? null,
+          notes: row.content ?? null,
+          tags: row.tags ?? []
+        }))
+      ) as PatternSummary;
       setPatterns(summary);
     } finally {
       setAdding(false);
